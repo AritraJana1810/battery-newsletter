@@ -219,31 +219,50 @@ def claude(messages, system="", max_tokens=4096):
     return resp["content"][0]["text"]
 
 
-def score_and_summarise(papers):
-    print("Scoring and summarising with Claude...")
+def score_batch(batch, offset):
+    """Score a single batch of up to 8 papers."""
     paper_list = json.dumps([{
-        "id": i, "title": p["title"],
-        "journal": p["journal"], "abstract": p["abstract"],
-    } for i, p in enumerate(papers)], indent=2)
+        "id": offset + i,
+        "title": p["title"],
+        "journal": p["journal"],
+        # Trim abstract to 400 chars to keep payload small
+        "abstract": p["abstract"][:400],
+    } for i, p in enumerate(batch)], indent=2)
 
     prompt = f"""Research focus:
 {RESEARCH_FOCUS}
 
-Below are {len(papers)} recent papers. Return ONLY a JSON array (no markdown, no preamble) where each object has:
+Rate these {len(batch)} papers. Return ONLY a JSON array (no markdown, no preamble) where each object has:
   "id": same integer as input,
   "relevance_score": integer 0-100,
-  "summary": "2-3 sentence summary of key findings",
-  "connection": "1-2 sentences on how this relates to silicon-graphite anodes and cathode degradation"
+  "summary": "2 sentence summary of key findings",
+  "connection": "1 sentence on how this relates to silicon-graphite anodes and cathode degradation"
 
 Papers:
 {paper_list}"""
 
-    raw    = claude([{"role": "user", "content": prompt}],
-                    system="You are an expert battery scientist.", max_tokens=4000)
-    raw    = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
-    scored = json.loads(raw)
+    raw = claude([{"role": "user", "content": prompt}],
+                 system="You are an expert battery scientist. Reply only with the JSON array.",
+                 max_tokens=2000)
+    raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+    return json.loads(raw)
 
-    score_map = {s["id"]: s for s in scored}
+
+def score_and_summarise(papers):
+    print("Scoring and summarising with Claude...")
+    BATCH_SIZE = 6   # small batches to stay well under token limits
+    score_map  = {}
+
+    for start in range(0, len(papers), BATCH_SIZE):
+        batch = papers[start:start + BATCH_SIZE]
+        print(f"  Scoring batch {start//BATCH_SIZE + 1} ({len(batch)} papers)...")
+        try:
+            scored = score_batch(batch, start)
+            for s in scored:
+                score_map[s["id"]] = s
+        except Exception as e:
+            print(f"  Batch scoring error: {e} — assigning score 0 to this batch.")
+
     for i, p in enumerate(papers):
         s = score_map.get(i, {})
         p["relevance_score"] = s.get("relevance_score", 0)
