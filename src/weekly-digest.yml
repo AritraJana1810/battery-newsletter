@@ -1,0 +1,33 @@
+name: Weekly Research Digest
+
+on:
+  # Runs every Monday at 7:00 AM UTC (2:00 AM Indiana time)
+  schedule:
+    - cron: "0 7 * * 1"
+
+  # Lets you run it manually from the GitHub website anytime
+  workflow_dispatch:
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # No extra packages needed — the script uses only Python standard library
+      # plus the Anthropic API (called directly via urllib)
+
+      - name: Run newsletter bot
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: python src/newsletter.py
