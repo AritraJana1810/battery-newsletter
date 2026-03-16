@@ -27,15 +27,16 @@ RESEARCH_FOCUS = """
 PhD research on silicon-graphite composite anodes and how they drive cathode degradation.
 Key topics: SEI formation and evolution on Si particles, volume expansion effects,
 lithium plating on graphite, cross-talk degradation mechanisms, electrolyte decomposition
-products that accelerate NMC/NCA/LFP cathode aging, capacity fade in Si-graphite//NMC full cells.
+products that accelerate NMC/LCO cathode aging, capacity fade in Si-graphite/LCO full cells.
 """
 
 SEARCH_QUERIES = [
     "silicon graphite anode cathode degradation",
-    "NMC degradation silicon anode",
+    "LCO degradation silicon anode",
+    "silicon degradation pathways"
     "SEI silicon anode electrolyte",
     "lithium plating graphite silicon",
-    "volume expansion silicon cathode",
+    "volume expansion silicon anode",
     "electrolyte decomposition battery cathode aging",
 ]
 
@@ -50,6 +51,7 @@ PURDUE_PROXY_JOURNALS = [
     "Joule",
     "Nature Energy",
     "Small",
+    "Nature Communications"
 ]
 
 # ── HTTP helper with retry + back-off ─────────────────────────────────────────
