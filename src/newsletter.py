@@ -1,7 +1,7 @@
 """
 Battery Research Weekly Newsletter Bot
-Fetches real papers from OpenAlex + Semantic Scholar,
-summarises them with Claude, and emails the digest.
+Fetches real papers from OpenAlex, summarises them with GPT-4o,
+and emails the digest via Gmail.
 """
 
 import os
@@ -16,7 +16,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 # ── Configuration ──────────────────────────────────────────────────────────────
-ANTHROPIC_API_KEY  = os.environ["ANTHROPIC_API_KEY"]
+OPENAI_API_KEY     = os.environ["OPENAI_API_KEY"]
 GMAIL_ADDRESS      = os.environ["GMAIL_ADDRESS"]
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 RECIPIENT_EMAIL    = os.environ.get("RECIPIENT_EMAIL", GMAIL_ADDRESS)
@@ -191,32 +191,44 @@ def deduplicate(papers):
     return unique
 
 
-def collect_papers(days_back=7, max_papers=20):
-    print("Fetching papers...")
+def collect_papers(days_back=14, max_papers=20):
+    """Use OpenAlex only — no rate limits, no API key needed.
+    14 day window ensures enough papers."""
+    print("Fetching papers from OpenAlex...")
     all_papers = []
     for i, q in enumerate(SEARCH_QUERIES):
         print(f"  [{i+1}/{len(SEARCH_QUERIES)}] {q}")
         all_papers += fetch_openalex(q, days_back)
-        all_papers += fetch_semantic_scholar(q, days_back)
-        time.sleep(1)   # gentle pause between query pairs
+        time.sleep(0.5)
 
     all_papers = deduplicate(all_papers)
     all_papers = [p for p in all_papers if p.get("abstract") and len(p["abstract"]) > 80]
     print(f"  {len(all_papers)} unique papers with abstracts.")
+    if len(all_papers) < 5:
+        print("  Few papers — widening to 30 days...")
+        for q in SEARCH_QUERIES:
+            all_papers += fetch_openalex(q, 30)
+            time.sleep(0.5)
+        all_papers = deduplicate(all_papers)
+        all_papers = [p for p in all_papers if p.get("abstract") and len(p["abstract"]) > 80]
+        print(f"  {len(all_papers)} papers after widening.")
     return all_papers[:max_papers]
 
 
-# ── Claude API ─────────────────────────────────────────────────────────────────
-def claude(messages, system="", max_tokens=4096):
+# ── OpenAI API ─────────────────────────────────────────────────────────────────
+def gpt(messages, system="", max_tokens=2000):
+    """Call GPT-4o via the OpenAI Chat Completions API."""
+    payload_messages = []
+    if system:
+        payload_messages.append({"role": "system", "content": system})
+    payload_messages.extend(messages)
     resp = http_post(
-        "https://api.anthropic.com/v1/messages",
-        {"model": "claude-sonnet-4-20250514", "max_tokens": max_tokens,
-         "system": system, "messages": messages},
+        "https://api.openai.com/v1/chat/completions",
+        {"model": "gpt-4o", "max_tokens": max_tokens, "messages": payload_messages},
         headers={"Content-Type": "application/json",
-                 "x-api-key": ANTHROPIC_API_KEY,
-                 "anthropic-version": "2023-06-01"},
+                 "Authorization": f"Bearer {OPENAI_API_KEY}"},
     )
-    return resp["content"][0]["text"]
+    return resp["choices"][0]["message"]["content"]
 
 
 def score_batch(batch, offset):
@@ -241,7 +253,7 @@ Rate these {len(batch)} papers. Return ONLY a JSON array (no markdown, no preamb
 Papers:
 {paper_list}"""
 
-    raw = claude([{"role": "user", "content": prompt}],
+    raw = gpt([{"role": "user", "content": prompt}],
                  system="You are an expert battery scientist. Reply only with the JSON array.",
                  max_tokens=2000)
     raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
@@ -249,7 +261,7 @@ Papers:
 
 
 def score_and_summarise(papers):
-    print("Scoring and summarising with Claude...")
+    print("Scoring and summarising with GPT-4o...")
     BATCH_SIZE = 6   # small batches to stay well under token limits
     score_map  = {}
 
@@ -285,7 +297,7 @@ This week's top papers:
 {titles_and_summaries}
 
 Write a 4-5 sentence executive summary of the most important findings this week and what they mean for a PhD student studying cathode degradation in silicon-graphite full cells. Be specific."""
-    return claude([{"role": "user", "content": prompt}], max_tokens=500)
+    return gpt([{"role": "user", "content": prompt}], max_tokens=500)
 
 
 # ── Email building ─────────────────────────────────────────────────────────────
