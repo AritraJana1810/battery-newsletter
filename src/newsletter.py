@@ -352,7 +352,7 @@ def build_html_email(papers, exec_summary):
         <p style="margin:0;font-size:13px;color:#fff;line-height:1.7;">{exec_summary}</p>
       </td></tr>
       <tr><td style="background:#fff;padding:12px 28px;border-bottom:1px solid #eee;">
-        <p style="margin:0;font-size:12px;color:#888;">{len(papers)} relevant papers · OpenAlex & Semantic Scholar · Summarised by Claude</p>
+        <p style="margin:0;font-size:12px;color:#888;">{len(papers)} relevant papers · OpenAlex & Semantic Scholar · Summarised by ChatGPT</p>
       </td></tr>
       <tr><td style="background:#f5f5f5;padding:16px 28px;">{paper_html}</td></tr>
       <tr><td style="background:#fff;border-radius:0 0 10px 10px;padding:16px 28px;border-top:1px solid #eee;">
